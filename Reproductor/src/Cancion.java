@@ -1,26 +1,34 @@
-
-
 import java.io.File;
 
 public class Cancion {
-    private Cancion siguienteCancion;
-    private File ubicacionArchivo;
-    private File imagenArchivo;
     private String nombreCancion;
-    private String duracion;  
-    private String tipoMusica;  
-    
-   
-    public Cancion(String nombreCancion, File imagenArchivo, File ubicacionArchivo, String duracion, String tipoMusica) {
-        this.imagenArchivo = imagenArchivo;
-        this.ubicacionArchivo = ubicacionArchivo;
+    private File rutaImagen;
+    private File ubicacionArchivo;
+    private String duracion;
+    private String tipoMusica;
+    private Cancion siguienteCancion;
+
+    public Cancion(String nombreCancion, File rutaImagen, File ubicacionArchivo, String duracion, String tipoMusica) {
         this.nombreCancion = nombreCancion;
+        this.rutaImagen = rutaImagen;
+        this.ubicacionArchivo = ubicacionArchivo;
         this.duracion = duracion;
         this.tipoMusica = tipoMusica;
         this.siguienteCancion = null;
     }
-    
-  
+
+    public String getNombreCancion() {
+        return nombreCancion;
+    }
+
+    public File getRutaImagen() {
+        return rutaImagen;
+    }
+
+    public File getUbicacionArchivo() {
+        return ubicacionArchivo;
+    }
+
     public String getDuracion() {
         return duracion;
     }
@@ -29,23 +37,11 @@ public class Cancion {
         return tipoMusica;
     }
 
-    public void setSiguienteCancion(Cancion siguienteCancion) {
-        this.siguienteCancion = siguienteCancion;
-    }
-    
     public Cancion getSiguienteCancion() {
         return siguienteCancion;
     }
-    
-    public String getNombreCancion() {
-        return nombreCancion;
-    }
-    
-    public File getUbicacionArchivo() {
-        return ubicacionArchivo;
-    }
-    
-    public File getImagenArchivo() {
-        return imagenArchivo;
+
+    public void setSiguienteCancion(Cancion siguienteCancion) {
+        this.siguienteCancion = siguienteCancion;
     }
 }

@@ -1,27 +1,24 @@
-
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Image;
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileInputStream;
+import java.awt.*;
+import java.io.*;
 import javax.swing.*;
-import javazoom.jl.player.Player;
+import javazoom.jl.decoder.JavaLayerException;
+import javazoom.jl.player.advanced.AdvancedPlayer;
 
 public class PanelReproductor extends JPanel implements Runnable {
 
     private final GestorArchivos gestorArchivos;
+    private AdvancedPlayer reproductor;
+    private FileInputStream archivoMusica;
     private boolean reproduciendo;
-    private int ultimoFrame = 0;
-    private Player reproductor;
+    private boolean enPausa;
+    private long bytePosicionActual;
+    private File archivoActual;
+
     private JComboBox<String> listaCanciones;
     private JLabel imagenCancion;
     private JLabel duracionCancion;
     private JLabel tipoMusicaCancion;
-    private JButton botonPlay, botonStop, botonPause, botonAdd, botonSelect;
+    private JButton botonPlay, botonStop, botonPause, botonAdd, botonSelect, botonUpdate;
 
     public PanelReproductor(GestorArchivos gestorArchivos) {
         this.gestorArchivos = gestorArchivos;
@@ -35,14 +32,14 @@ public class PanelReproductor extends JPanel implements Runnable {
     private void inicializarElementos() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0;
-        gbc.gridy = 0;
-        gbc.gridwidth = 2;
+        gbc.insets.set(10, 10, 10, 10);
 
         JLabel textoLista = new JLabel("Lista de Canciones:");
         textoLista.setForeground(Color.WHITE);
         textoLista.setFont(new Font("Arial", Font.BOLD, 16));
-        gbc.insets.set(10, 10, 10, 10);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
         add(textoLista, gbc);
 
         listaCanciones = new JComboBox<>(gestorArchivos.listaCanciones.obtenerListaCanciones());
@@ -55,7 +52,6 @@ public class PanelReproductor extends JPanel implements Runnable {
         gbc.gridy = 2;
         gbc.gridwidth = 2;
         add(imagenCancion, gbc);
-        cambiarImagenCancion();
 
         duracionCancion = new JLabel("Duración: ");
         duracionCancion.setForeground(Color.WHITE);
@@ -75,45 +71,54 @@ public class PanelReproductor extends JPanel implements Runnable {
 
         botonPlay = new JButton("Play");
         botonPlay.setPreferredSize(new Dimension(100, 40));
-        botonPlay.addActionListener(e -> reproducirCancion());
+        gbc.gridx = 0;
         add(botonPlay, gbc);
+        botonPlay.addActionListener(e -> reproducirCancion());
 
         botonPause = new JButton("Pause");
-        gbc.gridx = 1;
         botonPause.setPreferredSize(new Dimension(100, 40));
-        botonPause.addActionListener(e -> pausarCancion());
+        gbc.gridx = 1;
         add(botonPause, gbc);
+        botonPause.addActionListener(e -> pausarReanudarCancion());
 
         gbc.gridx = 0;
         gbc.gridy = 5;
         botonStop = new JButton("Stop");
         botonStop.setPreferredSize(new Dimension(100, 40));
-        botonStop.addActionListener(e -> detenerCancion());
         add(botonStop, gbc);
+        botonStop.addActionListener(e -> detenerCancion());
 
-        botonAdd = new JButton("Add");
         gbc.gridx = 1;
+        botonAdd = new JButton("Add");
         botonAdd.setPreferredSize(new Dimension(100, 40));
-        botonAdd.addActionListener(e -> agregarCancion());
         add(botonAdd, gbc);
+        botonAdd.addActionListener(e -> agregarCancion());
 
-        botonSelect = new JButton("Select");
         gbc.gridx = 0;
         gbc.gridy = 6;
         gbc.gridwidth = 2;
+        botonSelect = new JButton("Select");
         botonSelect.setPreferredSize(new Dimension(100, 40));
-        botonSelect.addActionListener(e -> seleccionarCancion());
         add(botonSelect, gbc);
+        botonSelect.addActionListener(e -> seleccionarCancion());
+
+        gbc.gridy = 7;
+        gbc.gridwidth = 2;
+        botonUpdate = new JButton("Update");
+        botonUpdate.setPreferredSize(new Dimension(100, 40));
+        add(botonUpdate, gbc);
+        botonUpdate.addActionListener(e -> actualizarListaCanciones());
+
+        cambiarImagenCancion();
     }
 
     private void cambiarImagenCancion() {
         Cancion cancion = gestorArchivos.listaCanciones.obtenerCancion(listaCanciones.getSelectedIndex());
-        if (cancion != null && cancion.getImagenArchivo() != null) {
+        if (cancion != null && cancion.getRutaImagen() != null) {
             int ancho = (imagenCancion.getWidth() > 0) ? imagenCancion.getWidth() : 300;
             int alto = (imagenCancion.getHeight() > 0) ? imagenCancion.getHeight() : 300;
-            imagenCancion.setIcon(escalarImagen(cancion.getImagenArchivo().getAbsolutePath(), ancho, alto));
+            imagenCancion.setIcon(escalarImagen(cancion.getRutaImagen().getAbsolutePath(), ancho, alto));
 
-            // Actualizar duración y tipo de música
             duracionCancion.setText("Duración: " + cancion.getDuracion());
             tipoMusicaCancion.setText("Tipo de Música: " + cancion.getTipoMusica());
         }
@@ -127,56 +132,119 @@ public class PanelReproductor extends JPanel implements Runnable {
 
     private void reproducirCancion() {
         try {
-            if (!reproduciendo) {
-                Cancion cancion = gestorArchivos.listaCanciones.obtenerCancion(listaCanciones.getSelectedIndex());
-                if (cancion != null) {
-                    FileInputStream archivoMusica = new FileInputStream(cancion.getUbicacionArchivo());
-                    BufferedInputStream entrada = new BufferedInputStream(archivoMusica);
-                    reproductor = new Player(entrada);
-                    new Thread(() -> {
-                        try {
-                            reproductor.play();
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }).start();
-                    reproduciendo = true;
+            Cancion cancion = gestorArchivos.listaCanciones.obtenerCancion(listaCanciones.getSelectedIndex());
+            if (cancion != null && cancion.getUbicacionArchivo() != null) {
+                detenerCancion();
+
+                archivoActual = cancion.getUbicacionArchivo();
+
+                if (!enPausa) {
+                    archivoMusica = new FileInputStream(archivoActual);
+                    bytePosicionActual = 0;  // Comenzar desde el principio
+                } else {
+                    archivoMusica = new FileInputStream(archivoActual);
+                    archivoMusica.skip(bytePosicionActual);  // Reanudar desde la posición guardada
                 }
+
+                reproductor = new AdvancedPlayer(archivoMusica);
+                reproduciendo = true;
+
+                new Thread(() -> {
+                    try {
+                        reproductor.play();
+                    } catch (JavaLayerException e) {
+                        e.printStackTrace();
+                    }
+                }).start();
+
+                enPausa = false;
+                botonPause.setText("Pause");
+            } else {
+                System.out.println("Archivo de música no encontrado o ruta inválida.");
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
 
+    private void pausarReanudarCancion() {
+        if (enPausa) {
+            reproducirCancion();  // Reanudar
+        } else {
+            pausarCancion();  // Pausar
+        }
+    }
+
     private void pausarCancion() {
-        if (reproduciendo) {
-            reproductor.close();
-            reproduciendo = false;
+        if (reproduciendo && reproductor != null) {
+            try {
+                // Guardamos la posición actual en bytes
+                bytePosicionActual = archivoMusica.getChannel().position();
+
+                // Cerramos el reproductor para detener la música, pero mantenemos la posición en el archivo
+                reproductor.close();  // Detener el reproductor actual
+
+                archivoMusica.close();  // Cerramos el archivo pero mantenemos la posición en bytes
+                enPausa = true;  // Cambiamos el estado a 'enPausa'
+                botonPause.setText("Resume");  // Cambiamos el texto del botón a 'Resume' para que se reanude al presionarlo de nuevo
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
     }
 
     private void detenerCancion() {
-        if (reproduciendo) {
+        if (reproductor != null) {
             reproductor.close();
-            reproduciendo = false;
+            enPausa = false;
+            botonPause.setText("Pause");
+            bytePosicionActual = 0;  // Reiniciar la posición cuando se detiene la canción
         }
     }
 
     private void agregarCancion() {
-        String nombreCancion = JOptionPane.showInputDialog(this, "Nombre de la canción:");
-        String artista = JOptionPane.showInputDialog(this, "Artista:");
-        String duracion = JOptionPane.showInputDialog(this, "Duración:");
-        String tipoMusica = JOptionPane.showInputDialog(this, "Tipo de música:");
-        File archivo = new File("ruta/al/archivo.mp3");
-        File imagen = new File("ruta/a/la/imagen.jpg");
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setDialogTitle("Selecciona un archivo de música");
+        fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos MP3", "mp3"));
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File archivo = fileChooser.getSelectedFile();
+            fileChooser.setDialogTitle("Selecciona una imagen para la canción (opcional)");
+            fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Archivos de Imagen", "jpg", "png"));
+            result = fileChooser.showOpenDialog(this);
+            File imagen = null;
+            if (result == JFileChooser.APPROVE_OPTION) {
+                imagen = fileChooser.getSelectedFile();
+            }
 
-        Cancion nuevaCancion = new Cancion(nombreCancion, imagen, archivo, duracion, tipoMusica);
-        gestorArchivos.listaCanciones.agregarCancion(nuevaCancion);
-        listaCanciones.addItem(nombreCancion + " - " + artista);
+            String nombreCancion = JOptionPane.showInputDialog(this, "Nombre de la canción:");
+            String duracion = JOptionPane.showInputDialog(this, "Duración (en formato mm:ss):");
+            String tipoMusica = JOptionPane.showInputDialog(this, "Tipo de música:");
+
+            if (nombreCancion != null && !nombreCancion.trim().isEmpty()) {
+                Cancion nuevaCancion = new Cancion(nombreCancion, imagen, archivo, duracion, tipoMusica);
+                gestorArchivos.listaCanciones.agregarCancion(nuevaCancion);
+                gestorArchivos.guardarCancionEnArchivo(nuevaCancion);
+                listaCanciones.addItem(nombreCancion + " - " + tipoMusica);
+            } else {
+                JOptionPane.showMessageDialog(this, "Por favor, proporciona un nombre válido para la canción.");
+            }
+        }
     }
 
     private void seleccionarCancion() {
         cambiarImagenCancion();
+    }
+
+    private void actualizarListaCanciones() {
+        listaCanciones.removeAllItems();
+        String[] nuevasCanciones = gestorArchivos.listaCanciones.obtenerListaCanciones();
+        for (String cancion : nuevasCanciones) {
+            listaCanciones.addItem(cancion);
+        }
+        if (nuevasCanciones.length > 0) {
+            cambiarImagenCancion();
+        }
     }
 
     @Override
