@@ -1,3 +1,4 @@
+
 import java.awt.*;
 import java.io.*;
 import javax.swing.*;
@@ -140,10 +141,10 @@ public class PanelReproductor extends JPanel implements Runnable {
 
                 if (!enPausa) {
                     archivoMusica = new FileInputStream(archivoActual);
-                    bytePosicionActual = 0;  // Comenzar desde el principio
+                    bytePosicionActual = 0;
                 } else {
                     archivoMusica = new FileInputStream(archivoActual);
-                    archivoMusica.skip(bytePosicionActual);  // Reanudar desde la posición guardada
+                    archivoMusica.skip(bytePosicionActual);
                 }
 
                 reproductor = new AdvancedPlayer(archivoMusica);
@@ -169,24 +170,23 @@ public class PanelReproductor extends JPanel implements Runnable {
 
     private void pausarReanudarCancion() {
         if (enPausa) {
-            reproducirCancion();  // Reanudar
+            reproducirCancion();
         } else {
-            pausarCancion();  // Pausar
+            pausarCancion();
         }
     }
 
     private void pausarCancion() {
         if (reproduciendo && reproductor != null) {
             try {
-                // Guardamos la posición actual en bytes
+
                 bytePosicionActual = archivoMusica.getChannel().position();
 
-                // Cerramos el reproductor para detener la música, pero mantenemos la posición en el archivo
-                reproductor.close();  // Detener el reproductor actual
+                reproductor.close();
 
-                archivoMusica.close();  // Cerramos el archivo pero mantenemos la posición en bytes
-                enPausa = true;  // Cambiamos el estado a 'enPausa'
-                botonPause.setText("Resume");  // Cambiamos el texto del botón a 'Resume' para que se reanude al presionarlo de nuevo
+                archivoMusica.close();
+                enPausa = true;
+                botonPause.setText("Resume");
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -198,7 +198,7 @@ public class PanelReproductor extends JPanel implements Runnable {
             reproductor.close();
             enPausa = false;
             botonPause.setText("Pause");
-            bytePosicionActual = 0;  // Reiniciar la posición cuando se detiene la canción
+            bytePosicionActual = 0;
         }
     }
 
